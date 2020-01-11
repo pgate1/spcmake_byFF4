@@ -7,7 +7,7 @@
 // 再生時間(150 or 2:30) フェードアウト時間(ミリ秒)
 #length 1:10 6000
 
-//#brr_offset auto // デフォルトは0x4800
+#brr_offset auto // デフォルトは0x3000
 #brr_echo_overcheck // BRR領域がエコーバッファにかかるかチェック
 //#echo_depth 7 // デフォルトは5
 //#surround // 逆位相サラウンド有効
@@ -16,10 +16,10 @@
 // tone番号 "brrファイルパス" DC DD DE (各パラメータは16進数で)
 //#tone 64 "brr/ff4_04.brr" 00 00 00 // ハープ
 // FF4波形の使用(0～22) DC DD DE (もしくはパラメータ指定なし)
-#tone 64 "FF4inst:4" 00 00 00
+//#tone 64 "FF4inst:4" 00 00 00
 //#tone 64 "FF4inst:4"
 // FF4常駐波形の使用(s0～s6) DC DD DE (もしくはパラメータ指定なし)
-//#tone 64 "FF4inst:s0" 00 00 00
+#tone 64 "FF4inst:s5" 00 00 00
 //#tone 64 "FF4inst:s3"
 
 #track 1
