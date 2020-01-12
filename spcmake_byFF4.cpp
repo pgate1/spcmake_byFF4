@@ -40,6 +40,10 @@ public:
 	uint32 attack_table_size;
 	uint8 *attack_table;
 
+	// 効果音
+	uint8 *eseq;
+	uint8 *eseq_start;
+
 	FF4_AkaoSoundDriver()
 	{
 		driver = NULL;
@@ -49,6 +53,8 @@ public:
 		for(i=0; i<23; i++){
 			brr[i] = NULL;
 		}
+		eseq = NULL;
+		eseq_start = NULL;
 	}
 	~FF4_AkaoSoundDriver()
 	{
@@ -59,6 +65,8 @@ public:
 		for(i=0; i<23; i++){
 			if(brr[i]!=NULL) delete[] brr[i];
 		}
+		if(eseq!=NULL) delete[] eseq;
+		if(eseq_start!=NULL) delete[] eseq_start;
 	}
 };
 
@@ -161,15 +169,22 @@ int get_akao(const char *fname, FF4_AkaoSoundDriver &asd)
 	// 0x22254 2バイトはサイズ(0x1770)
 	// 0x22256 2バイトは配置先
 	// 0x22258 - 0x239C7 -> 0xB300 - 0xCA6F
+	uint16 eseq_size = *(uint16*)(rom+0x22254);
+	asd.eseq = new uint8[eseq_size];
+	memcpy(asd.eseq, rom+0x22258, eseq_size);
 
 	// 効果音シーケンスアドレス
 	// 0x239C8 2バイトはサイズ(0x200)
 	// 0x239CA 2バイトは配置先
 	// 0x239CC - 0x23BCB -> 0xFD00 - 0xFEFF
+	uint16 eseq_start_size = *(uint16*)(rom+0x239C8);
+	asd.eseq_start = new uint8[eseq_start_size];
+	memcpy(asd.eseq_start, rom+0x239CC, eseq_start_size);
 
 
 	// 0x2000 ～ シーケンス置き場
 	// 0x3000 ～ BRR置き場
+
 
 	// 波形ループ位置
 	// 0x248CF - 0x2492A -> 0x1F00 ～
@@ -653,25 +668,20 @@ int formatter(string &str, FF4_AkaoSoundDriver &asd, SPC &spc)
 			p--;
 			continue;
 		}
-		/*
 		// 効果音埋め込み
 		if(str[p]=='@' && str[p+1]=='@'){
 			int sp = p + 2;
 			int ep = term_end(str, sp);
 			int id = atoi(str.substr(sp, ep-sp).c_str());
-			if(id<0 || id>353){
-				printf("Error line %d : @@効果音番号は 0～353 までです.\n", line);
+			if(id<0 || id>255){
+				printf("Error line %d : @@効果音番号は 0～255 までです.\n", line);
 				return -1;
 			}
-			uint16 adrs = *(uint16*)(asd.eseq+id*2);
-			if(adrs==0x0000){
-				printf("Error line %d : @@%d 効果音はありません.\n", line, id);
-				return -1;
-			}
-			adrs -= 0x2C00;
+			uint16 adrs = *(uint16*)(asd.eseq_start+id*2);		
+			adrs -= 0xB300;
 			string estr;
 			int i;
-			for(i=adrs; asd.eseq[i]!=0xF2; i++){
+			for(i=adrs; asd.eseq[i]!=0xF1; i++){
 				sprintf(buf, "%02X ", asd.eseq[i]);
 				estr += buf;
 			}
@@ -679,7 +689,6 @@ int formatter(string &str, FF4_AkaoSoundDriver &asd, SPC &spc)
 			p--;
 			continue;
 		}
-		*/
 		// 波形指定の取得
 		if(str[p]=='@'){ // @3 @12
 			int sp = p + 1;
