@@ -475,7 +475,6 @@ int formatter(string &str, FF4_AkaoSoundDriver &asd, SPC &spc)
 				p--;
 				continue;
 			}
-			/*
 			// エコー深さ指定
 			if(str.substr(p, 11)=="#echo_depth"){
 				int sp = skip_space(str, p+11);
@@ -495,7 +494,6 @@ int formatter(string &str, FF4_AkaoSoundDriver &asd, SPC &spc)
 				p--;
 				continue;
 			}
-			*/
 			// 逆位相サラウンド有効
 			if(str.substr(p, 9)=="#surround"){
 				spc.f_surround = true;
@@ -975,6 +973,10 @@ int make_spc(SPC &spc, FF4_AkaoSoundDriver &asd, const char *spc_fname)
 	uint16 echobuf_start_adrs = 0xF800 - (spc.echo_depth << 11);
 //	dsp_reg[0x6D] = echobuf_start_adrs >> 8; // ESA
 //	dsp_reg[0x7D] = spc.echo_depth; // EDL
+
+	// EDL ドライバの値変更、デフォルト0x05
+	// ESAは自動計算される
+	asd.driver[0x0DA1] = spc.echo_depth;
 
 
 	// ベースアドレス
