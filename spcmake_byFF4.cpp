@@ -981,11 +981,6 @@ int make_spc(SPC &spc, FF4_AkaoSoundDriver &asd, const char *spc_fname)
 	memcpy(ram+0x0800, asd.driver, asd.driver_size);
 	// アタックテーブルアドレス
 	memcpy(ram+0x1D00, asd.attack_table_start, asd.attack_table_start_size);
-	// 常駐波形BRRアドレス
-	memcpy(ram+0x1E00, asd.sbrr_start, 32);
-
-	// 常駐波形BRR
-	memcpy(ram+0xCA70, asd.sbrr, asd.sbrr_size);
 	// アタックテーブル
 	memcpy(ram+0xF900, asd.attack_table, asd.attack_table_size);
 	// 常駐波形音程補正
@@ -1025,8 +1020,9 @@ int make_spc(SPC &spc, FF4_AkaoSoundDriver &asd, const char *spc_fname)
 	}
 
 	// BRR位置auto
+	uint16 brr_offset = spc.brr_offset;
 	if(spc.brr_offset==0xFFFF){
-		spc.brr_offset = seq_adrs_end;
+		brr_offset = seq_adrs_end;
 	}
 	seq_adrs_end--;
 	printf("SEQ end address 0x%04X\n", seq_adrs_end); //getchar();
@@ -1073,21 +1069,9 @@ int make_spc(SPC &spc, FF4_AkaoSoundDriver &asd, const char *spc_fname)
 	}
 	}
 
-	/*
-
-	// 20191228 常駐波形アドレス変更
-	uint16 brr_adrs_sa = spc.brr_offset - 0x4800;
-	for(i=0; i<8; i++){
-		asd.sbrr_start[  i*2] += brr_adrs_sa;
-		asd.sbrr_start[1+i*2] += brr_adrs_sa;
-	}
-	// 常駐波形BRRアドレス埋め込み
-	memcpy(ram+0x1B00, asd.sbrr_start, 32);
-*/
 	// BRR埋め込み
 	// すでに埋め込んだBRRは使いまわす
 	map<string, pair<uint16, uint16> > brr_put_map;
-	uint16 brr_offset = spc.brr_offset;
 	uint32 adrs_index = 0;
 	for(i=0; i<spc.brr_map.size(); i++){
 		string brr_fname = spc.brr_map[i].brr_fname;
@@ -1159,7 +1143,26 @@ int make_spc(SPC &spc, FF4_AkaoSoundDriver &asd, const char *spc_fname)
 		*(uint16*)(ram+0x1F00+i*4) = (uint16)start_adrs;
 		*(uint16*)(ram+0x1F02+i*4) = (uint16)loop_adrs;
 	}
-	uint32 brr_adrs_end = (uint32)brr_offset + adrs_index -1;
+
+	if(spc.brr_offset==0xFFFF){ // auto
+		brr_offset += (uint16)adrs_index;
+	}
+	else{
+		brr_offset = 0xCA70;
+	}
+	// 常駐波形BRR
+//	memcpy(ram+0xCA70, asd.sbrr, asd.sbrr_size);
+	memcpy(ram+brr_offset, asd.sbrr, asd.sbrr_size);
+	// 常駐波形アドレス変更
+	uint16 brr_adrs_sa = 0xCA70 - brr_offset;
+	for(i=0; i<7; i++){
+		asd.sbrr_start[  i*2] -= brr_adrs_sa;
+		asd.sbrr_start[1+i*2] -= brr_adrs_sa;
+	}
+	// 常駐波形BRRアドレス
+	memcpy(ram+0x1E00, asd.sbrr_start, 32);
+
+	uint32 brr_adrs_end = (uint32)brr_offset + asd.sbrr_size -1;
 	printf("BRR end address 0x%04X\n", brr_adrs_end); //getchar();
 	printf("EchoBuf start   0x%04X\n", echobuf_start_adrs);//getchar();
 	if(spc.f_brr_echo_overcheck){
@@ -1200,7 +1203,7 @@ int make_spc(SPC &spc, FF4_AkaoSoundDriver &asd, const char *spc_fname)
 
 int main(int argc, char *argv[])
 {
-	printf("spcmake_byFF4 ver.20200111\n");
+	printf("spcmake_byFF4 ver.20200112\n");
 
 #ifdef _DEBUG
 	argc = 3;
