@@ -73,9 +73,9 @@ MVOL_Rに0xC0を設定します。
 音色を設定します。
 基本的に音色を使用するトラック宣言の前に定義します。
 
-#tone _tone_num "brr_file_name" attack_type sustain_rate release_rate_
+#tone _tone_num "brr_file_name" tuning attack_type sustain_rate release_rate_
 
-    #tone 1 "brr/harp.brr" 00 0A 3B // 自分で用意したBRRファイルを使用する場合
+    #tone 1 "brr/harp.brr" 00 00 0A 3B // 自分で用意したBRRファイルを使用する場合
     #tone 2 "FF4inst:1" 00 0C 20 // FF4内蔵波形を使用（パラメータ指定あり）
     #tone 3 "FF4inst:5" // FF4内蔵音源を使用（パラメータ指定なし）
     #tone 4 "FF4inst:s0" 00 0C 20 // FF4常駐音源を使用（パラメータ指定あり）
@@ -85,9 +85,10 @@ FF4内蔵波形はFF4inst:0～22まで指定できます。
 FF4常駐波形はFF4inst:s0～s6まで指定できます。  
 パラメータは16進数で記述してください。  
 FF4instを指定する場合はパラメータを省略することができます。
-この場合、生成されるSPCにはそれぞれのコマンドは埋め込まれません。
+この場合、生成されるSPCにはそれぞれのコマンドは埋め込まれないため、シーケンスで記述してください。
 <br>  
-自前の.brrを使用する場合はパラメータも指定してください。  
+自前の.brrを使用する場合は4つのパラメータが必須です。  
+_tuning_ 音程補正を指定します。80～7F（-128～127）で指定してください。  
 _attack_type_ コマンドは DC XX に変換されます。  
 _sustain_rate_ コマンドは DD XX に変換されます。  
 _release_rate_ コマンドは DE XX に変換されます。

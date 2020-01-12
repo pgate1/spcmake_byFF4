@@ -218,6 +218,7 @@ struct TONE {
 	string brr_fname;
 	int brr_id; // formatter only
 	int inst_id; // 常駐波形 only
+	uint8 tuning; // 外部BRR用
 	uint8 attack; // 0xDC formatter only
 	uint8 sustain; // 0xDD formatter only
 	uint8 release; // 0xDE formatter only
@@ -554,12 +555,12 @@ int formatter(string &str, FF4_AkaoSoundDriver &asd, SPC &spc)
 				tone_map[tone_num].brr_fname = brr_fname;
 
 				// パラメータ取得、#toneは一行で記述すること
-				uint8 param[4];
+				uint8 param[5];
 				int param_num;
-				for(param_num=0; param_num<4 && str[ep]!='\0';){
+				for(param_num=0; param_num<5 && str[ep]!='\0';){
 					sp = ep;
 					while(str[sp]==' ' || str[sp]=='\t' || str[sp]=='\r') sp++;
-					if(str[sp]=='\n') break; // num==3の時ここで抜ければ正常
+					if(str[sp]=='\n') break; // num==3,4の時ここで抜ければ正常
 					ep = sp;
 					while(str[ep]!=' ' && str[ep]!='\t' && str[ep]!='\r' && str[ep]!='\n' && str[ep]!='\0') ep++;
 					param[param_num++] = strtol(str.substr(sp, ep-sp).c_str(), NULL, 16);
@@ -582,14 +583,15 @@ int formatter(string &str, FF4_AkaoSoundDriver &asd, SPC &spc)
 					}
 				}
 				else{ // brrファイル指定の場合
-					if(param_num==3){
+					if(param_num==4){
+						spc.brr_map[brr_id].tuning = param[0];
 						// adsr(DC DD DE)、パラメータは16進数
-						tone_map[tone_num].attack = param[0];
-						tone_map[tone_num].sustain = param[1];
-						tone_map[tone_num].release = param[2];
+						tone_map[tone_num].attack = param[1];
+						tone_map[tone_num].sustain = param[2];
+						tone_map[tone_num].release = param[3];
 					}
 					else{
-						printf("Error line %d : BRRファイル指定の場合は3個のパラメータを設定してください.\n", line);
+						printf("Error line %d : BRRファイル指定の場合は4個のパラメータを設定してください.\n", line);
 						return -1;
 					}
 				}
@@ -997,8 +999,9 @@ int make_spc(SPC &spc, FF4_AkaoSoundDriver &asd, const char *spc_fname)
 			int inst_id = atoi(spc.brr_map[i].brr_fname.substr(sp, ep-sp).c_str());
 			ram[0xFF40+i] = asd.brr_tune[inst_id];
 		}
-		else{ // 自作BRR
-			ram[0xFF40+i] = 0x00; // 音程補正はどうしようか？
+		else{ // 外部BRR
+			// 20200112 音程補正を指定できるように
+			ram[0xFF40+i] = spc.brr_map[i].tuning;
 		}
 	}
 

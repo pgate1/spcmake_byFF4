@@ -30,6 +30,7 @@ spcmake_byFF4.batをダブルクリック。
 
 2020/01/12
 #brr_offset auto で常駐波形BRRを波形BRRの直後に置くようにした。
+#tone の tuning 指定で音程補正値を埋め込むようにした。
 
 2020/01/11
 初版。
