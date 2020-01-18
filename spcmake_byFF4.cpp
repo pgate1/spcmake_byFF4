@@ -1033,6 +1033,9 @@ int spcmake_byFF4::make_spc(const char *spc_fname)
 	// フェードアウト時間(4byte)
 	*(uint32*)(header+0xAC) = spc.fade_time;
 
+	// used to dump
+	header[0xD1] = 4; // ETC
+
 
 	// サウンドメモリ
 	uint8 *ram = new uint8[0x10000];
