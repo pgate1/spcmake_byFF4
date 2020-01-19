@@ -588,7 +588,7 @@ int spcmake_byFF4::formatter(void)
 						return -1;
 					}
 					if((st.st_size-2)%9){
-						printf("Error line %d : BRRファイルサイズ異常です.ループアドレスが付加されていない？\n", line);
+						printf("Error line %d : BRRファイル %s サイズ異常です.ループアドレスが付加されていない？\n", line, brr_fname.c_str());
 						return -1;
 					}
 				}
