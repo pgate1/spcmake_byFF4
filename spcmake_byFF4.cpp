@@ -219,8 +219,8 @@ for(i=0; i<23; i++){
 	char fname[100];
 	sprintf(fname, "brr/ff4_%02X.brr", i);
 	FILE *fp = fopen(fname, "wb");
-	fwrite(asd.brr_loop+i, 1, 2, fp);
-	fwrite(asd.brr[i], 1, asd.brr_size[i], fp);
+	fwrite(brr_loop+i, 1, 2, fp);
+	fwrite(brr[i], 1, brr_size[i], fp);
 	fclose(fp);
 }
 }
@@ -569,9 +569,10 @@ int spcmake_byFF4::formatter(void)
 				if(brr_fname.substr(0,8)=="FF4inst:"){
 					int ssp = f_stayinst ? 9 : 8;
 					int eep = term_end(brr_fname, ssp);
-					int inst_id = atoi(brr_fname.substr(ssp, eep-ssp).c_str());
-					if(!f_stayinst && (inst_id<0 || inst_id>22)){
-						printf("Error line %d : FF4inst 波形指定は 0～22 としてください.\n", line);
+					int inst_id = strtol(brr_fname.substr(ssp, eep-ssp).c_str(), NULL, 16);
+					//printf("inst_id %d\n", inst_id);getchar();
+					if(!f_stayinst && (inst_id<0 || inst_id>0x16)){
+						printf("Error line %d : FF4inst 波形指定は 00～16(16進数) としてください.\n", line);
 						return -1;
 					}
 					if(f_stayinst && (inst_id<0 || inst_id>6)){
@@ -584,6 +585,10 @@ int spcmake_byFF4::formatter(void)
 					struct stat st;
 					if(stat(brr_fname.c_str(), &st)!=0){
 						printf("Error line %d : BRRファイル %s がありません.\n", line, brr_fname.c_str());
+						return -1;
+					}
+					if((st.st_size-2)%9){
+						printf("Error line %d : BRRファイルサイズ異常です.ループアドレスが付加されていない？\n", line);
 						return -1;
 					}
 				}
@@ -1084,7 +1089,7 @@ int spcmake_byFF4::make_spc(const char *spc_fname)
 		if(spc.brr_map[i].brr_fname.substr(0, 8)=="FF4inst:"){
 			int sp = 8;
 			int ep = term_end(spc.brr_map[i].brr_fname, sp);
-			int inst_id = atoi(spc.brr_map[i].brr_fname.substr(sp, ep-sp).c_str());
+			int inst_id = strtol(spc.brr_map[i].brr_fname.substr(sp, ep-sp).c_str(), NULL, 16);
 			ram[0xFF40+i] = asd.brr_tune[inst_id];
 		}
 		else{ // 外部BRR
@@ -1175,7 +1180,7 @@ int spcmake_byFF4::make_spc(const char *spc_fname)
 			if(brr_fname.substr(0, 8)=="FF4inst:"){ // FF4の波形
 				int sp = 8;
 				int ep = term_end(brr_fname, sp);
-				int inst_id = atoi(brr_fname.substr(sp, ep-sp).c_str());
+				int inst_id = strtol(brr_fname.substr(sp, ep-sp).c_str(), NULL, 16);
 				brr_size = asd.brr_size[inst_id] + 2; // 先頭2バイトループ追加
 				brr_data = new uint8[brr_size];
 				memcpy(brr_data+2, asd.brr[inst_id], asd.brr_size[inst_id]);
@@ -1302,7 +1307,7 @@ int spcmake_byFF4::make_spc(const char *spc_fname)
 
 int main(int argc, char *argv[])
 {
-	printf("[ spcmake_byFF4 ver.20200118 ]\n\n");
+	printf("[ spcmake_byFF4 ver.20200119 ]\n\n");
 
 #ifdef _DEBUG
 	argc = 3;
