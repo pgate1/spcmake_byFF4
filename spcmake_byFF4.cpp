@@ -713,7 +713,7 @@ int spcmake_byFF4::formatter(void)
 				printf("Error line %d : @@Œø‰Ê‰¹”Ô†‚Í 0`255 ‚Ü‚Å‚Å‚·.\n", line);
 				return -1;
 			}
-			uint16 adrs = *(uint16*)(asd.eseq_start+id*2);		
+			uint16 adrs = *(uint16*)(asd.eseq_start+id*2);
 			adrs -= 0xB300;
 			string estr;
 			int i;
