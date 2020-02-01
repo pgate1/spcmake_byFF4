@@ -201,12 +201,12 @@ int FF4_AkaoSoundDriver::get_akao(const char *rom_fname)
 	memcpy(brr_tune, rom+0x2492B, 23); // 1byte x 23
 
 	// 音源BRR
-	// 0x24942 - 0x24989 // 3byte x 23
+	// 0x24942 - 0x24986 // 3byte x 23
 	// リトルエンディアン3byte
 	// 得た値に+0x24000した値がオフセット 最初の3byteの00はおそらく波形番号0番(無音)のこと
 	for(i=0; i<23; i++){
 		// 先頭2バイトはサイズ
-		int brr_adrs = (*(uint32*)(rom+0x24942+i*3) & 0x00FFFFFF) + 0x24000;
+		int brr_adrs = (*(uint32*)(rom+0x24942+i*3) & 0x0001FFFF) + 0x24000;
 		brr_size[i] = *(uint16*)(rom+brr_adrs);
 		brr[i] = new uint8[brr_size[i]];
 		memcpy(brr[i], rom+brr_adrs+2, brr_size[i]);
