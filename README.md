@@ -1,6 +1,6 @@
 # spcmake_byFF4
 
-Make a FF4-like SPC from your hexadecimal MML using FinalFantasy4 rom.
+Make a SNES FF4-like SPC from your hexadecimal MML using FinalFantasy4 rom.
 The hexadecimal control code sequence of the FF5 sound driver can be described on a text basis.  
 <br>
 ※WARNING  
