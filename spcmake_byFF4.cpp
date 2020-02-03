@@ -17,9 +17,12 @@ typedef unsigned char  uint8;
 typedef unsigned short uint16;
 typedef unsigned long  uint32;
 
+static const int FF4_BRR_NUM = 23; // 音色の数
+
 class FF4_AkaoSoundDriver
 {
 public:
+
 	uint32 driver_size;
 	uint8 *driver;
 
@@ -30,10 +33,10 @@ public:
 	uint8 sbrr_tune[8];
 
 	// 波形
-	uint32 brr_size[23];
-	uint8 *brr[23];
-	uint16 brr_loop[23];
-	uint8 brr_tune[23];
+	uint32 brr_size[FF4_BRR_NUM];
+	uint8 *brr[FF4_BRR_NUM];
+	uint16 brr_loop[FF4_BRR_NUM];
+	uint8 brr_tune[FF4_BRR_NUM];
 
 	uint32 attack_table_start_size;
 	uint8 *attack_table_start;
@@ -50,7 +53,7 @@ public:
 		attack_table_start = NULL;
 		attack_table = NULL;
 		int i;
-		for(i=0; i<23; i++){
+		for(i=0; i<FF4_BRR_NUM; i++){
 			brr[i] = NULL;
 		}
 		eseq = NULL;
@@ -62,7 +65,7 @@ public:
 		if(attack_table_start!=NULL) delete[] attack_table_start;
 		if(attack_table!=NULL) delete[] attack_table;
 		int i;
-		for(i=0; i<23; i++){
+		for(i=0; i<FF4_BRR_NUM; i++){
 			if(brr[i]!=NULL) delete[] brr[i];
 		}
 		if(eseq!=NULL) delete[] eseq;
@@ -192,19 +195,19 @@ int FF4_AkaoSoundDriver::get_akao(const char *rom_fname)
 	// 0x248CF - 0x2492A -> 0x1F00 ～
 	// リトルエンディアン4byte 最初の2byteは00 00でその後2byteがループ位置 
 	int i;
-	for(i=0; i<23; i++){
+	for(i=0; i<FF4_BRR_NUM; i++){
 		brr_loop[i] = *(uint16*)(rom+0x248CF+i*4+2); // 4byte x 23
 	}
 
 	// 音源音程補正
 	// 0x2492B - 0x24941 -> 0xFF40 ～
-	memcpy(brr_tune, rom+0x2492B, 23); // 1byte x 23
+	memcpy(brr_tune, rom+0x2492B, FF4_BRR_NUM); // 1byte x 23
 
 	// 音源BRR
 	// 0x24942 - 0x24986 // 3byte x 23
 	// リトルエンディアン3byte
 	// 得た値に+0x24000した値がオフセット 最初の3byteの00はおそらく波形番号0番(無音)のこと
-	for(i=0; i<23; i++){
+	for(i=0; i<FF4_BRR_NUM; i++){
 		// 先頭2バイトはサイズ
 		int brr_adrs = (*(uint32*)(rom+0x24942+i*3) & 0x0001FFFF) + 0x24000;
 		brr_size[i] = *(uint16*)(rom+brr_adrs);
@@ -215,7 +218,7 @@ int FF4_AkaoSoundDriver::get_akao(const char *rom_fname)
 {
 system("mkdir brr");
 int i;
-for(i=0; i<23; i++){
+for(i=0; i<FF4_BRR_NUM; i++){
 	char fname[100];
 	sprintf(fname, "brr/ff4_%02X.brr", i);
 	FILE *fp = fopen(fname, "wb");
@@ -571,7 +574,7 @@ int spcmake_byFF4::formatter(void)
 					int eep = term_end(brr_fname, ssp);
 					int inst_id = strtol(brr_fname.substr(ssp, eep-ssp).c_str(), NULL, 16);
 					//printf("inst_id %d\n", inst_id);getchar();
-					if(!f_stayinst && (inst_id<0 || inst_id>0x16)){
+					if(!f_stayinst && (inst_id<0 || inst_id>=FF4_BRR_NUM)){
 						printf("Error line %d : FF4inst 波形指定は 00～16(16進数) としてください.\n", line);
 						return -1;
 					}
@@ -1058,6 +1061,7 @@ int spcmake_byFF4::make_spc(const char *spc_fname)
 	memset(dsp_reg, 0x00, 128);
 	dsp_reg[0x0C] = 0x40; // MVOL_L
 	dsp_reg[0x1C] = spc.f_surround ? 0xC0 : 0x40; // MVOL_R
+//	dsp_reg[0x0D] = 0x46; // EFB 設定できない？
 	dsp_reg[0x5D] = 0x1E; // DIR
 	dsp_reg[0x6C] = 0x20; // FLG
 	// エコーバッファ領域設定
@@ -1305,20 +1309,56 @@ int spcmake_byFF4::make_spc(const char *spc_fname)
 	return 0;
 }
 
+#include "brr2wav.cpp"
+
 int main(int argc, char *argv[])
 {
-	printf("[ spcmake_byFF4 ver.20200119 ]\n\n");
+	printf("[ spcmake_byFF4 ver.20200203 ]\n\n");
 
 #ifdef _DEBUG
-	argc = 3;
-	argv[1] = "sample.txt";
-	argv[2] = "sample.spc";
+	argc = 5;
+	argv[1] = "-i";
+	argv[2] = "sample.txt";
+	argv[3] = "-o";
+	argv[4] = "sample.spc";
 #endif
 
-	if(argc!=3){
-		printf("useage : spcmake_byFF4.exe input.txt output.spc\n");
+	if(argc<5){
+		printf("usage : spcmake_byFF4.exe -i input.txt -o output.spc\n");
 		getchar();
 		return -1;
+	}
+
+	char *input_fname = NULL;
+	char *output_fname = NULL;
+	bool f_ticks = false;
+	bool f_brr2wav = false;
+
+	int argi;
+	for(argi=1; argi<argc; argi++){
+		if(strncmp(argv[argi], "-i", 2)==0){
+			input_fname = argv[argi+1];
+			argi++;
+		}
+		else if(strncmp(argv[argi], "-o", 2)==0){
+			output_fname = argv[argi+1];
+			if(strncmp(output_fname+strlen(output_fname)-4, ".spc", 4)!=0){
+				printf("Error : -o %s 出力ファイル名が.spcではありません.\n", output_fname);
+				return -1;
+			}
+			argi++;
+		}
+		else if(strncmp(argv[argi], "-ticks", 6)==0){
+			f_ticks = true;
+		}
+		else if(strncmp(argv[argi], "-brr2wav", 8)==0){
+			f_brr2wav = true;
+		}
+		else{
+			printf("不明なオプション？ %s \n", argv[argi]);
+			getchar();
+			return -1;
+		}
 	}
 
 	spcmake_byFF4 spcmakeff4;
@@ -1327,7 +1367,17 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
-	if(spcmakeff4.read_mml(argv[1])){
+	if(f_brr2wav){
+		system("mkdir brr2wav");
+		int i;
+		for(i=0; i<FF4_BRR_NUM; i++){
+			char wav_fname[40];
+			sprintf(wav_fname, "brr2wav/FF4_%02X.wav", i);
+			brr2wav(wav_fname, spcmakeff4.asd.brr[i], spcmakeff4.asd.brr_size[i], spcmakeff4.asd.brr_loop[i], 0x1000);
+		}
+	}
+
+	if(spcmakeff4.read_mml(input_fname)){
 		return -1;
 	}
 
@@ -1348,14 +1398,17 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
-	int i;
-	for(i=0; i<8; i++){
-		printf("  track%d %6d ticks\n", i+1, spcmakeff4.get_ticks(spcmakeff4.spc.seq[i]));
-	}
-	printf("\n");
-
-	if(spcmakeff4.make_spc(argv[2])){
+	if(spcmakeff4.make_spc(output_fname)){
 		return -1;
+	}
+
+	if(f_ticks){
+		int i;
+		for(i=0; i<8; i++){
+			printf("  track%d %6d ticks\n", i+1, spcmakeff4.get_ticks(spcmakeff4.spc.seq[i]));
+		}
+		printf("\n");
+		getchar();
 	}
 
 //	getchar();
