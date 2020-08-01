@@ -343,6 +343,12 @@ int term_end(const string &str, int p)
 	return p;
 }
 
+int num_end(const string &str, int p)
+{
+	while(isdigit(str[p])) p++;
+	return p;
+}
+
 int get_hex(const string &str, int p)
 {
 	char buf[3];
@@ -475,6 +481,7 @@ int spcmake_byFF4::formatter(void)
 			}
 			// 再生時間とフェードアウト時間の設定
 			if(str.substr(p, 7)=="#length"){
+				// 再生時間
 				int sp = skip_space(str, p+7);
 				int ep = term_end(str, sp);
 				string sec_str = str.substr(sp, ep-sp);
@@ -519,8 +526,7 @@ int spcmake_byFF4::formatter(void)
 			// BRR領域がエコーバッファに重なるのチェックを有効にする
 			if(str.substr(p, 19)=="#brr_echo_overcheck"){
 				spc.f_brr_echo_overcheck = true;
-				int ep = term_end(str, p);
-				str.erase(p, ep-p);
+				str.erase(p, 19);
 				p--;
 				continue;
 			}
@@ -546,8 +552,7 @@ int spcmake_byFF4::formatter(void)
 			// 逆位相サラウンド有効
 			if(str.substr(p, 9)=="#surround"){
 				spc.f_surround = true;
-				int ep = term_end(str, p);
-				str.erase(p, ep-p);
+				str.erase(p, 9);
 				p--;
 				continue;
 			}
@@ -761,7 +766,7 @@ int spcmake_byFF4::formatter(void)
 		// ループの処理
 		if(str[p]==']'){ // ループの後ろ
 			int sp = skip_space(str, p+1);
-			int ep = term_end(str, sp);
+			int ep = num_end(str, sp);
 			int loop_count = atoi(str.substr(sp, ep-sp).c_str());
 			str.replace(p, ep-p, "F0 ");
 			// ループの先頭 [ を見つける
