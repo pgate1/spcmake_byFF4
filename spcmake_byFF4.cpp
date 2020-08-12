@@ -404,7 +404,7 @@ int spcmake_byFF4::formatter(void)
 //{FILE *fp=fopen("sample_debug.txt","w");fprintf(fp,str.c_str());fclose(fp);}
 
 	char buf[1024];
-	map<int, FF4_TONE> tone_map;
+	map<string, FF4_TONE> tone_map;
 	int brr_id = 0;
 
 	int p;
@@ -558,11 +558,11 @@ int spcmake_byFF4::formatter(void)
 			}
 			// 波形宣言
 			if(str.substr(p, 5)=="#tone"){
-				int sp = skip_space(str, p+5); // 数字の先頭
+				int sp = skip_space(str, p+5); // tone指定先頭
 				int ep = term_end(str, sp);
-				int tone_num = atoi(str.substr(sp, ep-sp).c_str());
+				string tone_num = str.substr(sp, ep-sp);
 				if(tone_map.find(tone_num)!=tone_map.end()){
-					printf("Error line %d : #tone %d はすでに宣言されています.\n", line, tone_num);
+					printf("Error line %d : #tone %s はすでに宣言されています.\n", line, tone_num.c_str());
 					return -1;
 				}
 				// 常駐波形でもオクターブ・トランスポーズ・ディチューン設定するから追加
@@ -734,12 +734,12 @@ int spcmake_byFF4::formatter(void)
 			continue;
 		}
 		// 波形指定の取得
-		if(str[p]=='@'){ // @3 @12
+		if(str[p]=='@'){ // @3 @12 @B @0C @piano
 			int sp = p + 1;
 			int ep = term_end(str, sp);
-			int tone_num = atoi(str.substr(sp, ep-sp).c_str());
+			string tone_num = str.substr(sp, ep-sp);
 			if(tone_map.find(tone_num)==tone_map.end()){
-				printf("Error line %d : @%d 定義されていません.\n", line, tone_num);
+				printf("Error line %d : @%s 定義されていません.\n", line, tone_num.c_str());
 				return -1;
 			}
 			// FF4instでattackが0xFFなら生成しない
