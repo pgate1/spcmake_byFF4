@@ -44,7 +44,9 @@ public:
 	uint8 *attack_table;
 
 	// 効果音
+	uint32 eseq_size;
 	uint8 *eseq;
+	uint32 eseq_start_size;
 	uint8 *eseq_start;
 
 	FF4_AkaoSoundDriver()
@@ -174,7 +176,7 @@ int FF4_AkaoSoundDriver::get_akao(const char *rom_fname)
 	// 0x22254 2バイトはサイズ(0x1770)
 	// 0x22256 2バイトは配置先
 	// 0x22258 - 0x239C7 -> 0xB300 - 0xCA6F
-	uint16 eseq_size = *(uint16*)(rom+0x22254);
+	eseq_size = *(uint16*)(rom+0x22254);
 	eseq = new uint8[eseq_size];
 	memcpy(eseq, rom+0x22258, eseq_size);
 
@@ -182,7 +184,7 @@ int FF4_AkaoSoundDriver::get_akao(const char *rom_fname)
 	// 0x239C8 2バイトはサイズ(0x200)
 	// 0x239CA 2バイトは配置先
 	// 0x239CC - 0x23BCB -> 0xFD00 - 0xFEFF
-	uint16 eseq_start_size = *(uint16*)(rom+0x239C8);
+	eseq_start_size = *(uint16*)(rom+0x239C8);
 	eseq_start = new uint8[eseq_start_size];
 	memcpy(eseq_start, rom+0x239CC, eseq_start_size);
 
@@ -268,6 +270,7 @@ public:
 	bool f_brr_echo_overcheck;
 	uint16 echo_depth;
 	bool f_surround; // 逆位相サラウンド
+	bool f_eseq_out; // 効果音シーケンス埋め込み
 
 	FF4_SPC()
 	{
@@ -283,6 +286,7 @@ public:
 		f_brr_echo_overcheck = false;
 		echo_depth = 5;
 		f_surround = false;
+		f_eseq_out = true;
 	}
 	~FF4_SPC()
 	{
@@ -505,6 +509,7 @@ int spcmake_byFF4::formatter(void)
 			}
 			// BRRオフセット
 			if(str.substr(p, 11)=="#brr_offset"){
+				spc.f_eseq_out = false;
 				int sp = skip_space(str, p+11);
 				int ep = term_end(str, sp);
 				if(str.substr(sp, ep-sp)=="auto"){
@@ -768,19 +773,20 @@ int spcmake_byFF4::formatter(void)
 			int sp = skip_space(str, p+1);
 			int ep = num_end(str, sp);
 			int loop_count = atoi(str.substr(sp, ep-sp).c_str());
+			// "]" → "F0 "
 			str.replace(p, ep-p, "F0 ");
 			// ループの先頭 [ を見つける
-			int jump_dest = 0;
+			int break_dest = 0;
 			int lp = p;
 			for(lp=sp; lp>=0; lp--){
 				if(str[lp]=='[') break;
-				// ループ中のF9ジャンプ処理
+				// ループ中の条件ジャンプ処理
 				if(str[lp]=='|'){
-					str.insert(p+3, "jump_dest ");
-					sprintf(buf, "F5 %02X jump_src ", (uint8)loop_count);
+					str.insert(p+3, "break_dest ");
+					sprintf(buf, "F5 %02X break_src ", (uint8)loop_count);
 					str.replace(lp, 1, buf);
-					// "F1 " + "jump_dest " + "F9 XX jump_src "
-					jump_dest = 3 + 10 + 15;
+					// "|" → "F5 XX break_src " + "break_dest "
+					break_dest = (16-1) + 11;
 				}
 			}
 			if(lp==-1){
@@ -790,7 +796,7 @@ int spcmake_byFF4::formatter(void)
 			// "[" → "E0 02 "
 			sprintf(buf, "E0 %02X ", (uint8)(loop_count-1));
 			str.replace(lp, 1, buf);
-			p += (6-1) + (jump_dest-1);
+			p += (6-1) + (3-1) + break_dest;
 			continue;
 		}
 		// 10進数から16進数に変換
@@ -826,6 +832,7 @@ int spcmake_byFF4::formatter(void)
 	// 最後に#track_end_markを付加
 	str.insert(p, "#9", 2);
 
+// フォーマット処理したものをテスト出力
 //FILE *fp=fopen("sample_debug.txt","w");fprintf(fp,str.c_str());fclose(fp);
 
 	return 0;
@@ -899,17 +906,17 @@ int spcmake_byFF4::get_sequence(void)
 			continue;
 		}
 		// F5コマンドの処理
-		// F5 01 jump_src  XX XX XX F0 jump_dest 
-		if(seq_size>1 && seq[seq_size-2]==0xF5 && str.substr(p, 8)=="jump_src"){
+		// F5 01 break_src  XX XX XX F0 break_dest 
+		if(seq_size>1 && seq[seq_size-2]==0xF5 && str.substr(p, 9)=="break_src"){
 			int jp = 2; // F9からの相対アドレス、2で合う
 			int lp;
-			for(lp=p+8; str[lp]!='#'; lp++){
-				if(str.substr(lp, 9)=="jump_dest"){
-					str.erase(lp, 9); // dest削除
+			for(lp=p+9; str[lp]!='#'; lp++){
+				if(str.substr(lp, 10)=="break_dest"){
+					str.erase(lp, 10); // dest削除
 					// ジャンプ先相対値を入れておく(必須)
 					char buf[10];
 					sprintf(buf, "%02X %02X ", (uint8)jp, (uint8)(jp>>8));
-					str.replace(p, 8, buf); // src置き換え
+					str.replace(p, 9, buf); // src置き換え
 					spc.break_point[seq_id].push_back(seq_size); // ジャンプ先アドレスを置く場所
 					break;
 				}
@@ -1090,7 +1097,10 @@ int spcmake_byFF4::make_spc(const char *spc_fname)
 	// 常駐波形音程補正
 	memcpy(ram+0xFF00, asd.sbrr_tune, 8);
 	// 効果音シーケンス等
-//	memcpy(ram+0xXX00, asd.eseq, asd.eseq_size); // 使用しない
+	if(spc.f_eseq_out){ // オフセット調整無しなら埋め込む
+		memcpy(ram+0xB300, asd.eseq, asd.eseq_size);
+		memcpy(ram+0xFD00, asd.eseq_start, asd.eseq_start_size);
+	}
 
 	// 音程補正埋め込み
 	int i;
@@ -1264,6 +1274,10 @@ int spcmake_byFF4::make_spc(const char *spc_fname)
 		printf("Error : BRRエリアが常駐波形BRRエリアと重なっています.\n");
 		return -1;
 	}
+	if(spc.f_eseq_out && brr_adrs_end >= 0xB300){
+		printf("Error : BRRエリアが効果音シーケンスエリアと重なっています.\n");
+		return -1;
+	}
 
 	// 常駐波形BRR
 //	memcpy(ram+0xCA70, asd.sbrr, asd.sbrr_size);
@@ -1318,7 +1332,7 @@ int spcmake_byFF4::make_spc(const char *spc_fname)
 
 int main(int argc, char *argv[])
 {
-	printf("[ spcmake_byFF4 ver.20200812 ]\n\n");
+	printf("[ spcmake_byFF4 ver.20200821 ]\n\n");
 
 #ifdef _DEBUG
 	argc = 5;
