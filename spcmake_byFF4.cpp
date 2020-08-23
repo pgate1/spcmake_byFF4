@@ -61,6 +61,7 @@ public:
 		eseq = NULL;
 		eseq_start = NULL;
 	}
+
 	~FF4_AkaoSoundDriver()
 	{
 		if(driver!=NULL) delete[] driver;
@@ -288,6 +289,7 @@ public:
 		f_surround = false;
 		f_eseq_out = true;
 	}
+
 	~FF4_SPC()
 	{
 		int i;
@@ -310,7 +312,7 @@ public:
 	int read_mml(const char *mml_fname);
 	int formatter(void);
 	int get_sequence(void);
-	int get_ticks(uint8 *seq);
+	int get_ticks(int track);
 	int make_spc(const char *spc_fname);
 };
 
@@ -371,6 +373,15 @@ int get_hex(const string &str, int p)
 	return hex;
 }
 
+int is_space(const char c)
+{
+// isspace() 0x20 0x09 0x0D 0x0A     0x0B 0x0C
+	if(c==' ' || c=='\t' || c=='\r' || c=='\n' || c=='\0'){
+		return 1;
+	}
+	return 0;
+}
+
 int is_cmd(const char c)
 {
 	if((c>='0' && c<='9') || (c>='A' && c<='F')){
@@ -408,8 +419,10 @@ int spcmake_byFF4::formatter(void)
 //{FILE *fp=fopen("sample_debug.txt","w");fprintf(fp,str.c_str());fclose(fp);}
 
 	char buf[1024];
+	int track_num = 0;
 	map<string, FF4_TONE> tone_map;
 	int brr_id = 0;
+	bool f_octave_swap = false;
 
 	int p;
 	for(p=0; str[p]!='\0'; p++){
@@ -417,7 +430,9 @@ int spcmake_byFF4::formatter(void)
 			line++;
 		//	printf("line %d %s\n", line, str.c_str()+p+1);getchar();
 		}
+
 		if(str[p]=='#'){
+
 			// 曲名の取得
 			if(str.substr(p, 9)=="#songname"){
 				int sp = str.find('"', p+9) + 1;
@@ -431,6 +446,7 @@ int spcmake_byFF4::formatter(void)
 				p--;
 				continue;
 			}
+
 			// ゲーム名の取得
 			if(str.substr(p, 10)=="#gametitle"){
 				int sp = str.find('"', p+10) + 1;
@@ -444,6 +460,7 @@ int spcmake_byFF4::formatter(void)
 				p--;
 				continue;
 			}
+
 			// 作曲者の取得
 			if(str.substr(p, 7)=="#artist"){
 				int sp = str.find('"', p+7) + 1;
@@ -457,6 +474,7 @@ int spcmake_byFF4::formatter(void)
 				p--;
 				continue;
 			}
+
 			// 作成者の取得
 			if(str.substr(p, 7)=="#dumper"){
 				int sp = str.find('"', p+7) + 1;
@@ -470,6 +488,7 @@ int spcmake_byFF4::formatter(void)
 				p--;
 				continue;
 			}
+
 			// コメントの取得
 			if(str.substr(p, 8)=="#comment"){
 				int sp = str.find('"', p+8) + 1;
@@ -483,6 +502,7 @@ int spcmake_byFF4::formatter(void)
 				p--;
 				continue;
 			}
+
 			// 再生時間とフェードアウト時間の設定
 			if(str.substr(p, 7)=="#length"){
 				// 再生時間
@@ -507,9 +527,13 @@ int spcmake_byFF4::formatter(void)
 				p--;
 				continue;
 			}
+
 			// BRRオフセット
 			if(str.substr(p, 11)=="#brr_offset"){
+
+				// オフセット時は効果音シーケンスは出力しない
 				spc.f_eseq_out = false;
+
 				int sp = skip_space(str, p+11);
 				int ep = term_end(str, sp);
 				if(str.substr(sp, ep-sp)=="auto"){
@@ -528,6 +552,7 @@ int spcmake_byFF4::formatter(void)
 				p--;
 				continue;
 			}
+
 			// BRR領域がエコーバッファに重なるのチェックを有効にする
 			if(str.substr(p, 19)=="#brr_echo_overcheck"){
 				spc.f_brr_echo_overcheck = true;
@@ -535,6 +560,7 @@ int spcmake_byFF4::formatter(void)
 				p--;
 				continue;
 			}
+
 			// エコー深さ指定
 			if(str.substr(p, 11)=="#echo_depth"){
 				int sp = skip_space(str, p+11);
@@ -554,6 +580,7 @@ int spcmake_byFF4::formatter(void)
 				p--;
 				continue;
 			}
+
 			// 逆位相サラウンド有効
 			if(str.substr(p, 9)=="#surround"){
 				spc.f_surround = true;
@@ -561,6 +588,15 @@ int spcmake_byFF4::formatter(void)
 				p--;
 				continue;
 			}
+
+			// オクターブコマンド入れ替え
+			if(str.substr(p, 7)=="#swap<>"){
+				f_octave_swap ^= 1;
+				str.erase(p, 7);
+				p--;
+				continue;
+			}
+
 			// 波形宣言
 			if(str.substr(p, 5)=="#tone"){
 				int sp = skip_space(str, p+5); // tone指定先頭
@@ -669,11 +705,12 @@ int spcmake_byFF4::formatter(void)
 				p--;
 				continue;
 			}
+
 			// トラック番号の取得
 			if(str.substr(p, 6)=="#track"){
 				int sp = skip_space(str, p+6);
 				int ep = term_end(str, sp);
-				int track_num = atoi(str.substr(sp, ep-sp).c_str());
+				track_num = atoi(str.substr(sp, ep-sp).c_str());
 				if(!(track_num>=1 && track_num<=8)){
 					printf("Error line %d : #trackナンバーは1～8としてください.\n", line);
 					return -1;
@@ -683,6 +720,7 @@ int spcmake_byFF4::formatter(void)
 				p++;
 				continue;
 			}
+
 			// マクロ定義
 			if(str.substr(p, 6)=="#macro"){
 				// マクロ定義
@@ -702,7 +740,7 @@ int spcmake_byFF4::formatter(void)
 					if(sp==string::npos) break;
 					//printf("macro_val_line %d\n", line);
 					ep = sp + macro_key.length();
-					if((!isalnum(str[sp-1])) && (!isalnum(str[ep]))){
+					if(!isalnum(str[sp-1]) && !isalnum(str[ep])){
 						str.replace(sp, ep-sp, macro_val);
 					}
 					lp = sp + macro_val.length();
@@ -717,6 +755,7 @@ int spcmake_byFF4::formatter(void)
 			p--;
 			continue;
 		}
+
 		// 効果音埋め込み
 		if(str[p]=='@' && str[p+1]=='@'){
 			int sp = p + 2;
@@ -738,6 +777,7 @@ int spcmake_byFF4::formatter(void)
 			p--;
 			continue;
 		}
+
 		// 波形指定の取得
 		if(str[p]=='@'){ // @3 @12 @B @0C @piano
 			int sp = p + 1;
@@ -768,6 +808,7 @@ int spcmake_byFF4::formatter(void)
 			p--;
 			continue;
 		}
+
 		// ループの処理
 		if(str[p]==']'){ // ループの後ろ
 			int sp = skip_space(str, p+1);
@@ -799,6 +840,7 @@ int spcmake_byFF4::formatter(void)
 			p += (6-1) + (3-1) + break_dest;
 			continue;
 		}
+
 		// 10進数から16進数に変換
 		if(str[p]=='d'){
 			int sp = p + 1;
@@ -809,19 +851,28 @@ int spcmake_byFF4::formatter(void)
 			p--;
 			continue;
 		}
+
 		// オクターブ操作
 		if(str[p]=='>'){
-			sprintf(buf, "E1");
+			if(f_octave_swap) sprintf(buf, "E2"); // オクターブ -1
+			else sprintf(buf, "E1"); // オクターブ +1
 			str.replace(p, 1, buf);
 			p++;
 			continue;
 		}
 		if(str[p]=='<'){
-			sprintf(buf, "E2");
+			if(f_octave_swap) sprintf(buf, "E1"); // オクターブ +1
+			else sprintf(buf, "E2"); // オクターブ -1
 			str.replace(p, 1, buf);
 			p++;
 			continue;
 		}
+
+		// トラックループ
+		if(str[p]=='L' && is_space(str[p-1]) && is_space(str[p+1])){
+			continue;
+		}
+
 		// コンバート終了
 		if(str[p]=='!'){
 			str.erase(p);
@@ -830,7 +881,7 @@ int spcmake_byFF4::formatter(void)
 	}
 
 	// 最後に#track_end_markを付加
-	str.insert(p, "#9", 2);
+	str.insert(p, "#9");
 
 // フォーマット処理したものをテスト出力
 //FILE *fp=fopen("sample_debug.txt","w");fprintf(fp,str.c_str());fclose(fp);
@@ -856,6 +907,7 @@ int spcmake_byFF4::get_sequence(void)
 			return -1;
 		}
 		if(str[p]=='\n') line++;
+
 		if(str[p]=='#'){
 			//printf("t%d\n", track_num);
 			// トラックの終了
@@ -895,6 +947,7 @@ int spcmake_byFF4::get_sequence(void)
 			continue;
 		}
 		if(track_num==0) continue;
+
 		// トラックループの検出
 		if(str[p]=='L'){
 			if(spc.track_loop[seq_id]!=0xFFFF){ // すでに L があった
@@ -905,6 +958,7 @@ int spcmake_byFF4::get_sequence(void)
 			spc.track_loop[seq_id] = seq_size;
 			continue;
 		}
+
 		// F5コマンドの処理
 		// F5 01 break_src  XX XX XX F0 break_dest 
 		if(seq_size>=2 && seq[seq_size-2]==0xF5 && str.substr(p, 9)=="break_src"){
@@ -912,12 +966,12 @@ int spcmake_byFF4::get_sequence(void)
 			int lp;
 			for(lp=p+9; str[lp]!='#'; lp++){
 				if(str.substr(lp, 10)=="break_dest"){
-					str.erase(lp, 10); // dest削除
-					// ジャンプ先相対値を入れておく(必須)
+					str.erase(lp, 10); // break_dest削除
+					// break先相対値を入れておく(必須)
 					char buf[10];
 					sprintf(buf, "%02X %02X ", (uint8)jp, (uint8)(jp>>8));
-					str.replace(p, 9, buf); // src置き換え
-					spc.break_point[seq_id].push_back(seq_size); // ジャンプ先アドレスを置く場所
+					str.replace(p, 9, buf); // break_src置き換え
+					spc.break_point[seq_id].push_back(seq_size); // braek先アドレスを置く場所
 					break;
 				}
 				if(is_cmd(str[lp])){
@@ -928,6 +982,8 @@ int spcmake_byFF4::get_sequence(void)
 			p--;
 			continue;
 		}
+
+		// 制御コマンド処理
 		if(is_cmd(str[p])){
 			seq[seq_size++] = get_hex(str, p);
 		//	printf("0x%02X ",get_hex(str, p));getchar();
@@ -962,8 +1018,10 @@ int spcmake_byFF4::get_sequence(void)
 	return 0;
 }
 
-int spcmake_byFF4::get_ticks(uint8 *seq)
+int spcmake_byFF4::get_ticks(int track)
 {
+	const uint8 *seq = spc.seq[track];
+
 	int tick = 0;
 
 	int ticks[15] = {192, 144, 96, 72, 64, 48, 36, 32, 24, 16, 12, 8, 6, 4, 3};
@@ -996,7 +1054,10 @@ int spcmake_byFF4::get_ticks(uint8 *seq)
 		else if(c==0xF0){ // ループ終了
 			loop_depth--;
 		}
-		else if(c==0xF1 || c==0xF4){ // 終了、ジャンプ
+		else if(c==0xF4 && (p+3)==spc.seq_size[track]){ // トラックループ
+			break;
+		}
+		else if(c==0xF1){ // 終了
 			break;
 		}
 		p += length[c-0xD0];
@@ -1152,13 +1213,13 @@ int spcmake_byFF4::make_spc(const char *spc_fname)
 		*(uint16*)(ram+0x2000+i*2) = seq_adrs[i];
 	}
 
-	// トラックループアドレス埋め込み
-	// F4 XX XX
 	{
 	int t, i;
+	// トラックループアドレス埋め込み
+	// F4 XX XX
 	for(t=0; t<8; t++){
 	//	printf("seq%d_size %d\n", t, spc.seq_size[t]);
-		if(spc.track_loop[t]!=0xFFFF){
+		if(spc.track_loop[t]!=0xFFFF){ // Lがある場合
 			for(i=spc.seq_size[t]-1; i>=0; i--){
 				// トラック最後のF4に対してのみループアドレスを調整
 				if(spc.seq[t][i]==0xF4){
@@ -1171,6 +1232,7 @@ int spcmake_byFF4::make_spc(const char *spc_fname)
 			}
 		}
 	}
+
 	// ループブレイクジャンプ埋め込み
 	// F5 NN XX XX
 	for(t=0; t<8; t++){
@@ -1332,7 +1394,7 @@ int spcmake_byFF4::make_spc(const char *spc_fname)
 
 int main(int argc, char *argv[])
 {
-	printf("[ spcmake_byFF4 ver.20200821 ]\n\n");
+	printf("[ spcmake_byFF4 ver.20200823 ]\n\n");
 
 #ifdef _DEBUG
 	argc = 5;
@@ -1422,11 +1484,11 @@ int main(int argc, char *argv[])
 	}
 
 	if(f_ticks){
+		printf("\n");
 		int i;
 		for(i=0; i<8; i++){
-			printf("  track%d %6d ticks\n", i+1, spcmakeff4.get_ticks(spcmakeff4.spc.seq[i]));
+			printf("  track%d %6d ticks\n", i+1, spcmakeff4.get_ticks(i));
 		}
-		printf("\n");
 		getchar();
 	}
 

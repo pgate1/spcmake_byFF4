@@ -1,6 +1,6 @@
 ﻿#songname "DaDa"
 #gametitle "DoDo"
-#artist "Yohei Shiokawa"
+#artist "YS"
 #dumper "pgate1"
 #comment "sample"
 
@@ -11,6 +11,7 @@
 #brr_echo_overcheck // BRR領域がエコーバッファにかかるかチェック
 //#echo_depth 7 // デフォルトは5
 //#surround // 逆位相サラウンド有効
+//#swap<> // オクターブコマンドの入れ替え
 
 ////////////////////////////////////////////////////////////////////////
 // tone番号 "brrファイルパス" tuning DC DD DE (各パラメータは16進数で)
@@ -30,6 +31,12 @@ D4 32 // エコーボリューム
 D5 46 00 // エコーフィードバック
 F2 00 00 A0 // 音量
 EA // エコーオン
+
+/*
+F3 00 00 90 // パン
+@@1 CB @@3 CB @@5
+!
+*/
 
 @64 // 波形選択
 F3 00 00 90 // パン
