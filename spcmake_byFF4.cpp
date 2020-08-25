@@ -11,6 +11,7 @@
 #include<string>
 #include<map>
 #include<vector>
+#include<set>
 using namespace std;
 
 typedef unsigned char  uint8;
@@ -266,6 +267,7 @@ public:
 
 	uint16 track_loop[8]; // 0xF4 0xFFFFの場合はトラックループなし
 	vector<uint16> break_point[8]; // 0xF5
+	vector<uint16> jump_point[8]; // 0xF4
 
 	uint16 brr_offset;
 	bool f_brr_echo_overcheck;
@@ -321,7 +323,7 @@ int spcmake_byFF4::read_mml(const char *mml_fname)
 	// シーケンスファイル読み込み
 	FILE *fp = fopen(mml_fname, "r");
 	if(fp==NULL){
-		printf("MMLファイル %s が開けません.\n", mml_fname);
+		printf("HexMMLファイル %s が開けません.\n", mml_fname);
 		return -1;
 	}
 	char buf[1024];
@@ -346,6 +348,12 @@ int skip_space(const string &str, int p)
 int term_end(const string &str, int p)
 {
 	while(str[p]!=' ' && str[p]!='\t' && str[p]!='\r' && str[p]!='\n' && str[p]!='\0') p++;
+	return p;
+}
+
+int term_begin(const string &str, int p)
+{
+	while(str[p]!=' ' && str[p]!='\t' && str[p]!='\r' && str[p]!='\n' && str[p]!='\0') p--;
 	return p;
 }
 
@@ -418,11 +426,17 @@ int spcmake_byFF4::formatter(void)
 	
 //{FILE *fp=fopen("sample_debug.txt","w");fprintf(fp,str.c_str());fclose(fp);}
 
+	#define _MML_END_ "#track ;"
+	// 最後に _MML_END_ を付加
+	str.insert(str.length(), "\n"_MML_END_" ");
+
 	char buf[1024];
 	int track_num = 0;
 	map<string, FF4_TONE> tone_map;
 	int brr_id = 0;
 	bool f_octave_swap = false;
+	set<string> label_set;
+	map<string, int> label_map;
 
 	int p;
 	for(p=0; str[p]!='\0'; p++){
@@ -708,6 +722,28 @@ int spcmake_byFF4::formatter(void)
 
 			// トラック番号の取得
 			if(str.substr(p, 6)=="#track"){
+
+				// 前トラックの終了処理
+				if(label_map.size()){
+					map<string, int>::iterator mit;
+					for(mit=label_map.begin(); mit!=label_map.end(); ++mit){
+						if(label_set.find(mit->first)==label_set.end()){
+							printf("Error track %d : トラック内でジャンプラベル %s がありません.\n", track_num, mit->first.c_str());
+							return -1;
+						}
+					}
+				}
+
+				// #track ; → #9
+				if(str.substr(p, strlen(_MML_END_))==_MML_END_){
+					str.replace(p, strlen(_MML_END_), "#9");
+					break;
+				}
+
+				// トラック初期化
+				label_set.clear(); // ジャンプ先ラベルクリア
+				label_map.clear(); // ジャンプラベルクリア
+
 				int sp = skip_space(str, p+6);
 				int ep = term_end(str, sp);
 				track_num = atoi(str.substr(sp, ep-sp).c_str());
@@ -873,15 +909,58 @@ int spcmake_byFF4::formatter(void)
 			continue;
 		}
 
+		// ジャンプの処理
+		if(str[p]=='J' && is_space(str[p-1]) && is_space(str[p+1])){
+			int sp = skip_space(str, p+1);
+			int ep = term_end(str, sp);
+			string label_str = str.substr(sp, ep-sp);
+		//	printf("[%s]\n", label_str.c_str());getchar();
+			int label_num;
+			if(label_map.find(label_str)==label_map.end()){
+				label_num = label_map.size() + 1;
+				label_map[label_str] = label_num;
+			}
+			else{
+				label_num = label_map[label_str];
+			}
+			sprintf(buf, "F4 jump_src_%d%d ", track_num, label_num);
+			str.replace(p, ep-p, buf);
+			p += 15 -1;
+		//	str.insert(p,"p");
+			continue;
+		}
+		if(str[p]==':'){ // jump dst
+			int ep = p + 1;
+			int sp = term_begin(str, p-1) +1;
+			string label_str = str.substr(sp, ep-sp-1);
+		//	printf("[%s] %d\n", label_str.c_str(), ep-sp-1);getchar();
+			if(label_set.find(label_str)!=label_set.end()){
+				printf("Error line %d : ジャンプラベル %s はすでに定義されています.\n", line, label_str.c_str());
+				return -1;
+			}
+			label_set.insert(label_str);
+			int label_num;
+			if(label_map.find(label_str)==label_map.end()){
+				label_num = label_map.size() + 1;
+				label_map[label_str] = label_num;
+			}
+			else{
+				label_num = label_map[label_str];
+			}
+			sprintf(buf, "jump_dst_%d%d ", track_num, label_num);
+			str.replace(sp, ep-sp, buf);
+			p += -(ep-sp-1) + 12 -1;
+		//	str.insert(p,"p");
+			continue;
+		}
+
 		// コンバート終了
 		if(str[p]=='!'){
-			str.erase(p);
-			break;
+			str.replace(p, 1, "\n"_MML_END_" ");
+			p--;
+			continue;
 		}
 	}
-
-	// 最後に#track_end_markを付加
-	str.insert(p, "#9");
 
 // フォーマット処理したものをテスト出力
 //FILE *fp=fopen("sample_debug.txt","w");fprintf(fp,str.c_str());fclose(fp);
@@ -899,6 +978,9 @@ int spcmake_byFF4::get_sequence(void)
 
 	int track_num = 0;
 	int seq_id = -1;
+
+	multimap<int, int> jump_src_map[8];
+	map<int, int> jump_dst_map[8];
 
 	int p;
 	for(p=0; str[p]!='\0'; p++){
@@ -921,7 +1003,7 @@ int spcmake_byFF4::get_sequence(void)
 					seq[seq_size++] = spc.track_loop[seq_id] >> 8;
 				//	printf("t%d seq_size %d\n", track_num, seq_size); getchar();
 				}
-				// 20191230 F2で終わってないならF2を置く
+				// F2で終わってないならF2を置く
 				else if(seq[seq_size-1]!=0xF1){
 					seq[seq_size++] = 0xF1;
 				}
@@ -983,6 +1065,25 @@ int spcmake_byFF4::get_sequence(void)
 			continue;
 		}
 
+		// ジャンプの前処理
+		if(str.substr(p, 5)=="jump_"){
+			if(str.substr(p+5, 4)=="src_"){ // jump_src_NN
+				int jump_id = atoi(str.substr(p+9, 2).c_str());
+				jump_src_map[seq_id].insert(make_pair<int,int>(jump_id, seq_size));
+				str.insert(p+11, "00 00 ");
+				str.erase(p, 11);
+				p--;
+				continue;
+			}
+			if(str.substr(p+5, 4)=="dst_"){ // jump_dst_NN
+				int jump_id = atoi(str.substr(p+9, 2).c_str());
+				jump_dst_map[seq_id][jump_id] = seq_size;
+				str.erase(p, 11);
+				p--;
+				continue;
+			}
+		}
+
 		// 制御コマンド処理
 		if(is_cmd(str[p])){
 			seq[seq_size++] = get_hex(str, p);
@@ -992,8 +1093,20 @@ int spcmake_byFF4::get_sequence(void)
 		}
 	}
 
-	// trackがないならシーケンス終了を置いておく
+	// ジャンプの後処理
 	int t;
+	for(t=0; t<8; t++){
+		// jump_srcの位置に相対ジャンプ値を入れる
+		multimap<int, int>::iterator mit;
+		for(mit=jump_src_map[t].begin(); mit!=jump_src_map[t].end(); ++mit){
+			// jump_rel = jump_dst - jump_src
+			*(uint16*)(spc.seq[t] + mit->second) = jump_dst_map[t][mit->first] - mit->second;
+			// pointにjump_srcの位置を入れる
+			spc.jump_point[t].push_back(mit->second);
+		}
+	}
+
+	// trackがないならシーケンス終了を置いておく
 	for(t=0; t<8; t++){
 		if(spc.seq_size[t]==0){
 			spc.seq[t] = new uint8[1];
@@ -1213,8 +1326,10 @@ int spcmake_byFF4::make_spc(const char *spc_fname)
 		*(uint16*)(ram+0x2000+i*2) = seq_adrs[i];
 	}
 
+	// ジャンプ制御関連
 	{
 	int t, i;
+
 	// トラックループアドレス埋め込み
 	// F4 XX XX
 	for(t=0; t<8; t++){
@@ -1244,6 +1359,18 @@ int spcmake_byFF4::make_spc(const char *spc_fname)
 			*(uint16*)(ram+seq_adrs[t]+spc.break_point[t][i]) = jump_adrs;
 		}
 	}
+
+	// ジャンプアドレス埋め込み
+	// F4 XX XX
+	for(t=0; t<8; t++){
+		for(i=0; i<spc.jump_point[t].size(); i++){
+		//	printf("jump_rel %d  %d + %d\n", i, spc.jump_point[t][i], *(uint16*)(spc.seq[t]+spc.jump_point[t][i]));
+			uint16 jump_adrs = seq_adrs[t] + spc.jump_point[t][i] + *(uint16*)(spc.seq[t]+spc.jump_point[t][i]);
+		//	printf("jump_adrs 0x%04X\n", jump_adrs);
+			*(uint16*)(ram+seq_adrs[t]+spc.jump_point[t][i]) = jump_adrs;
+		}
+	}
+
 	}
 
 	// BRR埋め込み
@@ -1394,7 +1521,7 @@ int spcmake_byFF4::make_spc(const char *spc_fname)
 
 int main(int argc, char *argv[])
 {
-	printf("[ spcmake_byFF4 ver.20200823 ]\n\n");
+	printf("[ spcmake_byFF4 ver.20200825 ]\n\n");
 
 #ifdef _DEBUG
 	argc = 5;

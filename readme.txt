@@ -3,7 +3,7 @@
                                  　　　　      by pgate1
 
 FF4サウンドドライバやFF4波形を使ってSPCを生成します。
-MMLはFF4サウンドドライバ向けに特化したものです。
+HexMMLはFF4サウンドドライバ向けに特化したものです。
 
 ※警告
 生成されるSPCにはFF4のサウンドドライバや波形データが含まれています。
@@ -15,7 +15,7 @@ SPCデータを容易に公開されることはご遠慮ください。
 ご自身でFF4カートリッジからFinalFantasy4.romをダンプする。
 FinalFantasy4.romをspcmake_byFF4.exeと同じ場所に置く。
 必要であれば.brrを用意する。
-sample.txt のようなMMLを書く。
+sample.txt のようなHexMMLを書く。
 spcmake_byFF4.batをダブルクリック。
 エラーが無ければsample.spcが生成される。
 
@@ -28,6 +28,9 @@ spcmake_byFF4.batをダブルクリック。
 
 
 ▼ 履歴
+
+2020/08/25
+ジャンプコマンド(J)を追加。
 
 2020/08/23
 #swap<>を追加。
