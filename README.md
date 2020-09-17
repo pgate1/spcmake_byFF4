@@ -10,5 +10,8 @@ The generated SPC contains the FF4 sound driver and waveform data. Do not distri
 <br>
 See <a href=usage.md>usage.md</a> for HexMML commands.  
 Please refer to <a href=sample.txt>sample.txt</a> for HexMML sample.  
-<br>
-Change history is <a href=readme.txt>readme.txt</a>.
+
+Change history is <a href=readme.txt>readme.txt</a>.  
+
+FF5 version <a href=https://github.com/pgate1/spcmake_byFF5>spcmake_byFF5</a><br>
+FF6 version <a href=https://github.com/pgate1/spcmake_byFF6>spcmake_byFF6</a><br>
