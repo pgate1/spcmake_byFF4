@@ -240,6 +240,8 @@ for(i=0; i<FF4_BRR_NUM; i++){
 
 struct FF4_TONE {
 	string brr_fname;
+	bool used; // formatter only
+	int line; // formatter only
 	int brr_id; // formatter only
 	int inst_id; // 常駐波形 only
 	uint8 tuning; // 外部BRR用
@@ -615,13 +617,14 @@ int spcmake_byFF4::formatter(void)
 			if(str.substr(p, 5)=="#tone"){
 				int sp = skip_space(str, p+5); // tone指定先頭
 				int ep = term_end(str, sp);
-				string tone_num = str.substr(sp, ep-sp);
-				if(tone_map.find(tone_num)!=tone_map.end()){
-					printf("Error line %d : #tone %s はすでに宣言されています.\n", line, tone_num.c_str());
+				string tone_id = str.substr(sp, ep-sp);
+				if(tone_map.find(tone_id)!=tone_map.end()){
+					printf("Error line %d : #tone %s はすでに宣言されています.\n", line, tone_id.c_str());
 					return -1;
 				}
 				// 常駐波形でもオクターブ・トランスポーズ・ディチューン設定するから追加
-				tone_map[tone_num]; // tone追加
+				tone_map[tone_id].used = false; // tone追加
+				tone_map[tone_id].line = line;
 
 				// brr_fnameの取得
 				sp = skip_space(str, ep) + 1;
@@ -642,7 +645,7 @@ int spcmake_byFF4::formatter(void)
 						printf("Error line %d : FF4inst 常駐波形指定は s0～s6 としてください.\n", line);
 						return -1;
 					}
-					tone_map[tone_num].inst_id = inst_id;
+					tone_map[tone_id].inst_id = inst_id;
 				}
 				else{
 					struct stat st;
@@ -664,7 +667,7 @@ int spcmake_byFF4::formatter(void)
 					}
 					spc.brr_map[brr_id].brr_fname = brr_fname;
 				}
-				tone_map[tone_num].brr_fname = brr_fname;
+				tone_map[tone_id].brr_fname = brr_fname;
 
 				// パラメータ取得、#toneは一行で記述すること
 				uint8 param[5];
@@ -682,12 +685,12 @@ int spcmake_byFF4::formatter(void)
 				if(brr_fname.substr(0,8)=="FF4inst:"){
 					if(param_num==0){
 						// 無指定
-						tone_map[tone_num].attack = 0xFF; // DC DD DE を出力しない
+						tone_map[tone_id].attack = 0xFF; // DC DD DE を出力しない
 					}
 					else if(param_num==3){
-						tone_map[tone_num].attack = param[0];
-						tone_map[tone_num].sustain = param[1];
-						tone_map[tone_num].release = param[2];
+						tone_map[tone_id].attack = param[0];
+						tone_map[tone_id].sustain = param[1];
+						tone_map[tone_id].release = param[2];
 					}
 					else{
 						printf("Error line %d : FF4波形指定の場合のパラメータ数は0個か3個です.\n", line);
@@ -698,9 +701,9 @@ int spcmake_byFF4::formatter(void)
 					if(param_num==4){
 						spc.brr_map[brr_id].tuning = param[0];
 						// adsr(DC DD DE)、パラメータは16進数
-						tone_map[tone_num].attack = param[1];
-						tone_map[tone_num].sustain = param[2];
-						tone_map[tone_num].release = param[3];
+						tone_map[tone_id].attack = param[1];
+						tone_map[tone_id].sustain = param[2];
+						tone_map[tone_id].release = param[3];
 					}
 					else{
 						printf("Error line %d : BRRファイル指定の場合は4個のパラメータを設定してください.\n", line);
@@ -710,7 +713,7 @@ int spcmake_byFF4::formatter(void)
 
 				// 常駐波形の場合はbrr_idは使わない
 				if(!f_stayinst){
-					tone_map[tone_num].brr_id = brr_id;
+					tone_map[tone_id].brr_id = brr_id;
 					brr_id++;
 				}
 
@@ -818,26 +821,27 @@ int spcmake_byFF4::formatter(void)
 		if(str[p]=='@'){ // @3 @12 @B @0C @piano
 			int sp = p + 1;
 			int ep = term_end(str, sp);
-			string tone_num = str.substr(sp, ep-sp);
-			if(tone_map.find(tone_num)==tone_map.end()){
-				printf("Error line %d : @%s 定義されていません.\n", line, tone_num.c_str());
+			string tone_id = str.substr(sp, ep-sp);
+			if(tone_map.find(tone_id)==tone_map.end()){
+				printf("Error line %d : @%s 定義されていません.\n", line, tone_id.c_str());
 				return -1;
 			}
+			tone_map[tone_id].used = true;
 			// FF4instでattackが0xFFなら生成しない
 			char buf_attack[10], buf_sustain[10], buf_release[10];
-			if(tone_map[tone_num].brr_fname.substr(0,8)=="FF4inst:" && tone_map[tone_num].attack==0xFF){
+			if(tone_map[tone_id].brr_fname.substr(0,8)=="FF4inst:" && tone_map[tone_id].attack==0xFF){
 				sprintf(buf_attack, "");
 				sprintf(buf_sustain, "");
 				sprintf(buf_release, "");
 			}
 			else{
-				sprintf(buf_attack, "DC %02X", tone_map[tone_num].attack);
-				sprintf(buf_sustain, "DD %02X", tone_map[tone_num].sustain);
-				sprintf(buf_release, "DE %02X", tone_map[tone_num].release);
+				sprintf(buf_attack, "DC %02X", tone_map[tone_id].attack);
+				sprintf(buf_sustain, "DD %02X", tone_map[tone_id].sustain);
+				sprintf(buf_release, "DE %02X", tone_map[tone_id].release);
 			}
 			sprintf(buf, "DB %02X %s %s %s ",
-				(tone_map[tone_num].brr_fname.substr(0,9)=="FF4inst:s")
-					? tone_map[tone_num].inst_id : (0x40 + tone_map[tone_num].brr_id),
+				(tone_map[tone_id].brr_fname.substr(0,9)=="FF4inst:s")
+					? tone_map[tone_id].inst_id : (0x40 + tone_map[tone_id].brr_id),
 				buf_attack, buf_sustain, buf_release
 				);
 			str.replace(p, ep-p, buf);
@@ -959,6 +963,15 @@ int spcmake_byFF4::formatter(void)
 			str.replace(p, 1, "\n"_MML_END_" ");
 			p--;
 			continue;
+		}
+	}
+
+	// 未使用toneの警告
+	map<string, FF4_TONE>::iterator mit;
+	for(mit=tone_map.begin(); mit!=tone_map.end(); ++mit){
+		if(mit->second.used==false){
+			printf("Warning line %d : #tone %s \"%s\" は使用されていません.\n", mit->second.line, mit->first.c_str(), mit->second.brr_fname.c_str());
+			getchar();
 		}
 	}
 
@@ -1521,7 +1534,7 @@ int spcmake_byFF4::make_spc(const char *spc_fname)
 
 int main(int argc, char *argv[])
 {
-	printf("[ spcmake_byFF4 ver.20200825 ]\n\n");
+	printf("[ spcmake_byFF4 ver.20200919 ]\n\n");
 
 #ifdef _DEBUG
 	argc = 5;
