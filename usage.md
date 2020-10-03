@@ -31,7 +31,7 @@
 
 ## #dumper "_pgate1_"
 
-MMLの作成者を設定します。つまりあなたの名前。
+HexMMLの作成者を設定します。つまりあなたの名前。
 
 ## #comment "_nanikakaku_"
 
@@ -69,16 +69,21 @@ _depth_ はエコーの深さです。1(浅い)～15(深い)の間で指定し�
 逆位相サラウンドを有効にするオプション設定です。  
 MVOL_Rに0x40の代わりに0xC0を設定します。
 
-## #swap<>
+## #swap<> #swap><
 
 オクターブ変更コマンド < \> の機能を入れ替えます。
+
+## #auto_assign_toneid
+
+これを宣言すると、tone宣言で _tone_id_ を省略できます。
+省略された _tone_id_ には64から順に内部idが割り当てられます。
 
 ## #tone (音色定義)
 
 音色を設定します。
 基本的に音色を使用するトラック宣言の前に定義します。
 
-#tone _tone_num "brr_file_name" tuning attack_type sustain_rate release_rate_
+#tone _tone_id "brr_file_name" tuning attack_type sustain_rate release_rate_
 
     #tone 1 "brr/harp.brr" 00 00 0A 3B // 自分で用意したBRRファイルを使用する場合
     #tone 2 "FF4inst:1" 00 0C 20 // FF4内蔵波形を使用（パラメータ指定あり）
@@ -86,7 +91,7 @@ MVOL_Rに0x40の代わりに0xC0を設定します。
     #tone 4 "FF4inst:s0" 00 0C 20 // FF4常駐音源を使用（パラメータ指定あり）
     #tone 5 "FF4inst:s3" // FF4常駐音源を使用（パラメータ指定なし）
 
-_tone_num_ 数字（例：1, 3, 0A, 1C）や、文字列（例：base, TAM）を宣言します。
+_tone_id_ 数字（例：1, 3, 0A, 1C）や、文字列（例：base, TAM）を宣言します。
   
 FF4内蔵波形はFF4inst:00～16(16進数)を指定できます。00は無音です。  
 FF4常駐波形はFF4inst:s0～s6を指定できます。  
@@ -98,7 +103,9 @@ FF4instを指定する場合はパラメータを省略することができま�
 _tuning_ 音程補正を指定します。80～7F（-128～127）で指定してください。  
 _attack_type_ コマンドは DC XX に変換されます。  
 _sustain_rate_ コマンドは DD XX に変換されます。  
-_release_rate_ コマンドは DE XX に変換されます。
+_release_rate_ コマンドは DE XX に変換されます。  
+
+今のところtone宣言は32個までとさせてください。
 
 ## #track _track_num_
 
@@ -181,6 +188,6 @@ _n_ は効果音番号で 0～255 までです。
 
 ## !
 
-この記号以降のMMLコンパイルをストップします。
+この記号以降のコンパイルをストップします。
 
 以上。

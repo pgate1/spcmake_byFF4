@@ -437,6 +437,7 @@ int spcmake_byFF4::formatter(void)
 	map<string, FF4_TONE> tone_map;
 	int brr_id = 0;
 	bool f_octave_swap = false;
+	bool f_auto_assign_toneid = false;
 	set<string> label_set;
 	map<string, int> label_map;
 
@@ -606,9 +607,17 @@ int spcmake_byFF4::formatter(void)
 			}
 
 			// オクターブコマンド入れ替え
-			if(str.substr(p, 7)=="#swap<>"){
+			if(str.substr(p, 7)=="#swap<>" || str.substr(p, 7)=="#swap><"){
 				f_octave_swap ^= 1;
 				str.erase(p, 7);
+				p--;
+				continue;
+			}
+
+			// tone_idを省略時に自動割り当て
+			if(str.substr(p, 19)=="#auto_assign_toneid"){
+				f_auto_assign_toneid = true;
+				str.erase(p, 19);
 				p--;
 				continue;
 			}
@@ -616,8 +625,22 @@ int spcmake_byFF4::formatter(void)
 			// 波形宣言
 			if(str.substr(p, 5)=="#tone"){
 				int sp = skip_space(str, p+5); // tone指定先頭
+				if(str[sp]=='"'){
+					// tone_id省略されている場合は内部的に割り当てる
+					if(f_auto_assign_toneid){
+						static int auto_id = 64;
+						char id_buf[10];
+						sprintf(id_buf, "%d ", auto_id++);
+						str.insert(sp, id_buf);
+					}
+					else{
+						printf("Error line %d : #tone の tone_id が指定されていません.\n", line);
+						return -1;
+					}
+				}
 				int ep = term_end(str, sp);
 				string tone_id = str.substr(sp, ep-sp);
+				//printf("tone_id[%s]\n",tone_id.c_str());getchar();
 				if(tone_map.find(tone_id)!=tone_map.end()){
 					printf("Error line %d : #tone %s はすでに宣言されています.\n", line, tone_id.c_str());
 					return -1;
@@ -662,7 +685,7 @@ int spcmake_byFF4::formatter(void)
 				if(!f_stayinst){
 // FF4で使用可能なBRR数は？
 					if(brr_id>=32){
-						printf("Error line %d : BRRは32個までです.\n", line);
+						printf("Error line %d : tone宣言(BRR指定)は32個までです.\n", line);
 						return -1;
 					}
 					spc.brr_map[brr_id].brr_fname = brr_fname;
@@ -1514,7 +1537,7 @@ int spcmake_byFF4::make_spc(const char *spc_fname)
 	fwrite(ram, 1, 0x10000, ofp);
 	fwrite(dsp_reg, 1, 128, ofp);
 	fclose(ofp);
-	printf("%s を生成しました.\n", spc_fname);
+	printf("%s を生成しました.\n\n", spc_fname);
 /*
 	ofp = fopen("out.bin", "wb");
 	if(ofp==NULL){
@@ -1534,7 +1557,7 @@ int spcmake_byFF4::make_spc(const char *spc_fname)
 
 int main(int argc, char *argv[])
 {
-	printf("[ spcmake_byFF4 ver.20200919 ]\n\n");
+	printf("[ spcmake_byFF4 ver.20201003 ]\n\n");
 
 #ifdef _DEBUG
 	argc = 5;
@@ -1599,10 +1622,12 @@ int main(int argc, char *argv[])
 	}
 
 	if(spcmakeff4.read_mml(input_fname)){
+		printf("\n");
 		return -1;
 	}
 
 	if(spcmakeff4.formatter()){
+		printf("\n");
 #ifdef _DEBUG
 	getchar();
 #endif
@@ -1610,16 +1635,18 @@ int main(int argc, char *argv[])
 	}
 
 //fp=fopen("out.txt","w");fprintf(fp,str.c_str());fclose(fp);
-
+	printf("\n");
 	printf("songname[%s]\n", spcmakeff4.spc.songname.c_str());
 	printf("dumper[%s]\n", spcmakeff4.spc.dumper.c_str());
 	printf("\n");
 
 	if(spcmakeff4.get_sequence()){
+		printf("\n");
 		return -1;
 	}
 
 	if(spcmakeff4.make_spc(output_fname)){
+		printf("\n");
 		return -1;
 	}
 

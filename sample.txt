@@ -12,16 +12,23 @@
 //#echo_depth 7 // デフォルトは5
 //#surround // 逆位相サラウンド有効
 //#swap<> // オクターブコマンドの入れ替え
+//#auto_assign_toneid // tone_id省略時に自動割り当て
 
 ////////////////////////////////////////////////////////////////////////
-// tone番号 "brrファイルパス" tuning DC DD DE (各パラメータは16進数で)
-//#tone 64 "brr/ff4_04.brr" 00 00 00 00 // ハープ
-// FF4波形の使用(00～22) DC DD DE (もしくはパラメータ指定なし)
-#tone 64 "FF4inst:04" 00 00 00
-//#tone 64 "FF4inst:04"
-// FF4常駐波形の使用(s0～s6) DC DD DE (もしくはパラメータ指定なし)
-//#tone 64 "FF4inst:s5" 00 00 00
-//#tone 64 "FF4inst:s3"
+/*
+#tone tone_id "brrファイルパス" tuning DC DD DE (各パラメータは16進数で)
+#tone 63 "brr/ff4_04.brr" 00 00 00 00 // ハープ
+FF4波形の使用(00～22) DC DD DE (もしくはパラメータ指定なし)
+#tone 63 "FF4inst:04" 00 00 00
+#tone 63 "FF4inst:04"
+FF4常駐波形の使用(s0～s6) DC DD DE (もしくはパラメータ指定なし)
+#tone 63 "FF4inst:s5" 00 00 00
+#tone 63 "FF4inst:s3"
+*/
+
+#tone notuse "FF4inst:11"
+//#tone "FF4inst:04"
+//#tone 66 "FF4inst:13"
 
 #track 1
 
@@ -38,7 +45,7 @@ F3 00 00 90 // パン
 !
 */
 
-@64 // 波形選択
+@63 // 波形選択
 F3 00 00 90 // パン
 DA 06 // オクターブ
 
