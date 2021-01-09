@@ -104,7 +104,7 @@ int FF4_AkaoSoundDriver::get_akao(const char *rom_fname)
 		printf("FF4のromにヘッダが付いているようです？\n");
 		return -1;
 	}
-	if(!(rom[0x07FC0]=='F' && rom[0x07FC6]=='F' && rom[0x07FCE]=='4')){
+	if(!(rom[0x07FC0]=='F' && rom[0x07FC6]=='F' && (rom[0x07FCE]=='4' || rom[0x07FCE]=='2'))){
 		delete[] rom;
 		printf("FF4のromではない？\n");
 		return -1;
@@ -1557,7 +1557,7 @@ int spcmake_byFF4::make_spc(const char *spc_fname)
 
 int main(int argc, char *argv[])
 {
-	printf("[ spcmake_byFF4 ver.20201003 ]\n\n");
+	printf("[ spcmake_byFF4 ver.20210109 ]\n\n");
 
 #ifdef _DEBUG
 	argc = 5;
