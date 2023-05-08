@@ -6,7 +6,7 @@ The hexadecimal control code sequence of the FF5 sound driver can be described o
 ※WARNING  
 The generated SPC contains the FF4 sound driver and waveform data. Do not distribute SPC file.  
 <br>
-<!--http://gnilda.rosx.net/SPC/F4/command.html-->
+<!-- http://gnilda.rosx.net/SPC/F4/command.html -->
 <a href="https://web.archive.org/web/20211021124934/http://gnilda.rosx.net/SPC/F4/sequence_commands.html" target="_blank">FinalFantasyIV sound control code</a>.  
 <br>
 See <a href=usage.md>usage.md</a> for HexMML commands.  
